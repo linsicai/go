@@ -135,14 +135,16 @@ func ReadDir(dirname string) ([]os.FileInfo, error) {
 	return list, nil
 }
 
+// 空Close 函数
 type nopCloser struct {
 	io.Reader
 }
-
-func (nopCloser) Close() error { return nil }
-
+func (nopCloser) Close() error {
+    return nil
+}
 // NopCloser returns a ReadCloser with a no-op Close method wrapping
 // the provided Reader r.
+// 创建函数
 func NopCloser(r io.Reader) io.ReadCloser {
 	return nopCloser{r}
 }
@@ -152,34 +154,51 @@ type devNull int
 
 // devNull implements ReaderFrom as an optimization so io.Copy to
 // ioutil.Discard can avoid doing unnecessary work.
+// 提示实现了ReadFrom
 var _ io.ReaderFrom = devNull(0)
 
 func (devNull) Write(p []byte) (int, error) {
+    // 永远写成功
 	return len(p), nil
 }
 
 func (devNull) WriteString(s string) (int, error) {
+    // 永远写成功
 	return len(s), nil
 }
 
+// 黑洞池
 var blackHolePool = sync.Pool{
 	New: func() interface{} {
+	    // 返回8k 的buffer
 		b := make([]byte, 8192)
 		return &b
 	},
 }
 
+// io.Copy，作为dst 时，可以调用此函数
 func (devNull) ReadFrom(r io.Reader) (n int64, err error) {
+    // 取buffer
 	bufp := blackHolePool.Get().(*[]byte)
+
 	readSize := 0
 	for {
+	    // 读取
 		readSize, err = r.Read(*bufp)
+
+        // 取大小
 		n += int64(readSize)
+
 		if err != nil {
+		    // 资源回收
 			blackHolePool.Put(bufp)
+
 			if err == io.EOF {
+			    // 成功
 				return n, nil
 			}
+
+            // 失败
 			return
 		}
 	}
@@ -187,4 +206,5 @@ func (devNull) ReadFrom(r io.Reader) (n int64, err error) {
 
 // Discard is an io.Writer on which all Write calls succeed
 // without doing anything.
+// 假的
 var Discard io.Writer = devNull(0)
