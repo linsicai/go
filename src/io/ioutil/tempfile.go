@@ -17,22 +17,30 @@ import (
 // We generate random temporary file names so that there's a good
 // chance the file doesn't exist yet - keeps the number of tries in
 // TempFile to a minimum.
-var rand uint32
-var randmu sync.Mutex
+var rand uint32       // 种子
+var randmu sync.Mutex // 锁
 
+// 随机数种子 = 时间戳 + pid
 func reseed() uint32 {
 	return uint32(time.Now().UnixNano() + int64(os.Getpid()))
 }
 
 func nextRandom() string {
 	randmu.Lock()
+
+	// 获取种子
 	r := rand
 	if r == 0 {
 		r = reseed()
 	}
+
+	// 计算下一种子
 	r = r*1664525 + 1013904223 // constants from Numerical Recipes
 	rand = r
+
 	randmu.Unlock()
+
+	// 数字转字符串
 	return strconv.Itoa(int(1e9 + r%1e9))[1:]
 }
 
@@ -49,9 +57,11 @@ func nextRandom() string {
 // to remove the file when no longer needed.
 func TempFile(dir, pattern string) (f *os.File, err error) {
 	if dir == "" {
+		// 默认取临时目录
 		dir = os.TempDir()
 	}
 
+	// 找前缀和后缀
 	var prefix, suffix string
 	if pos := strings.LastIndex(pattern, "*"); pos != -1 {
 		prefix, suffix = pattern[:pos], pattern[pos+1:]
@@ -61,18 +71,28 @@ func TempFile(dir, pattern string) (f *os.File, err error) {
 
 	nconflict := 0
 	for i := 0; i < 10000; i++ {
+		// 新文件
 		name := filepath.Join(dir, prefix+nextRandom()+suffix)
+
+		// 打开文件
 		f, err = os.OpenFile(name, os.O_RDWR|os.O_CREATE|os.O_EXCL, 0600)
 		if os.IsExist(err) {
+			// 已经存在
 			if nconflict++; nconflict > 10 {
+				// 冲突数过大时，重置随机种子
 				randmu.Lock()
 				rand = reseed()
 				randmu.Unlock()
 			}
+
+			// 冲突了，继续
 			continue
 		}
+
+		// 成功 或 失败
 		break
 	}
+
 	return
 }
 
@@ -85,30 +105,46 @@ func TempFile(dir, pattern string) (f *os.File, err error) {
 // to remove the directory when no longer needed.
 func TempDir(dir, prefix string) (name string, err error) {
 	if dir == "" {
+		// 默认临时目录
 		dir = os.TempDir()
 	}
 
 	nconflict := 0
 	for i := 0; i < 10000; i++ {
+		// 新目录
 		try := filepath.Join(dir, prefix+nextRandom())
+
+		// 创建目录
 		err = os.Mkdir(try, 0700)
 		if os.IsExist(err) {
+			// 已经存在
+
 			if nconflict++; nconflict > 10 {
+				// 冲突数过大时，重置随机种子
 				randmu.Lock()
 				rand = reseed()
 				randmu.Unlock()
 			}
+
+			// 继续
 			continue
 		}
+
 		if os.IsNotExist(err) {
+			// 不存在，再次确认一下
 			if _, err := os.Stat(dir); os.IsNotExist(err) {
+				// 真的创建失败
 				return "", err
 			}
 		}
+
+		// 成功 或者 失败
 		if err == nil {
 			name = try
 		}
+
 		break
 	}
+
 	return
 }

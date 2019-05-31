@@ -17,22 +17,30 @@ import (
 // from the internal buffer allocated with a specified capacity.
 func readAll(r io.Reader, capacity int64) (b []byte, err error) {
 	var buf bytes.Buffer
+
 	// If the buffer overflows, we will get bytes.ErrTooLarge.
 	// Return that as an error. Any other panic remains.
 	defer func() {
+		// 取恢复函数
 		e := recover()
 		if e == nil {
 			return
 		}
+
+		// 抛异常
 		if panicErr, ok := e.(error); ok && panicErr == bytes.ErrTooLarge {
 			err = panicErr
 		} else {
 			panic(e)
 		}
 	}()
+
+	// buffer 适配
 	if int64(int(capacity)) == capacity {
 		buf.Grow(int(capacity))
 	}
+
+	// 读取
 	_, err = buf.ReadFrom(r)
 	return buf.Bytes(), err
 }
@@ -50,11 +58,15 @@ func ReadAll(r io.Reader) ([]byte, error) {
 // reads the whole file, it does not treat an EOF from Read as an error
 // to be reported.
 func ReadFile(filename string) ([]byte, error) {
+	// 打开文件
 	f, err := os.Open(filename)
 	if err != nil {
 		return nil, err
 	}
+
+	// 结束时关闭
 	defer f.Close()
+
 	// It's a good but not certain bet that FileInfo will tell us exactly how much to
 	// read, so let's try it but be prepared for the answer to be wrong.
 	var n int64 = bytes.MinRead
@@ -70,6 +82,7 @@ func ReadFile(filename string) ([]byte, error) {
 			n = size
 		}
 	}
+
 	return readAll(f, n)
 }
 
@@ -77,32 +90,47 @@ func ReadFile(filename string) ([]byte, error) {
 // If the file does not exist, WriteFile creates it with permissions perm;
 // otherwise WriteFile truncates it before writing.
 func WriteFile(filename string, data []byte, perm os.FileMode) error {
+	// 打开文件
 	f, err := os.OpenFile(filename, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, perm)
 	if err != nil {
 		return err
 	}
+
+	// 写数据
 	n, err := f.Write(data)
 	if err == nil && n < len(data) {
 		err = io.ErrShortWrite
 	}
+
+	// 关闭
 	if err1 := f.Close(); err == nil {
 		err = err1
 	}
+
 	return err
 }
 
 // ReadDir reads the directory named by dirname and returns
 // a list of directory entries sorted by filename.
 func ReadDir(dirname string) ([]os.FileInfo, error) {
+	// 打开目录
 	f, err := os.Open(dirname)
 	if err != nil {
 		return nil, err
 	}
+
+	// 读取目录
 	list, err := f.Readdir(-1)
+
+	// 关闭目录
 	f.Close()
+
 	if err != nil {
+		// 读取出错
 		return nil, err
 	}
+
+	// 排序
 	sort.Slice(list, func(i, j int) bool { return list[i].Name() < list[j].Name() })
 	return list, nil
 }
@@ -119,6 +147,7 @@ func NopCloser(r io.Reader) io.ReadCloser {
 	return nopCloser{r}
 }
 
+// 空设备
 type devNull int
 
 // devNull implements ReaderFrom as an optimization so io.Copy to
