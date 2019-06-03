@@ -112,7 +112,14 @@ func New(n int) *Ring {
 // them creates a single ring with the elements of s inserted
 // after r. The result points to the element following the
 // last element of s after insertion.
+// |———|
+// |      |
+// r —— n
 //
+// p —— s
+// |      |
+// |———|
+// r to s，s to p，p to n，n to r
 func (r *Ring) Link(s *Ring) *Ring {
 	n := r.Next()
 

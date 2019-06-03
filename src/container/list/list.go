@@ -18,12 +18,15 @@ type Element struct {
 	// as a ring, such that &l.root is both the next element of the last
 	// list element (l.Back()) and the previous element of the first list
 	// element (l.Front()).
+	// 前后指针
 	next, prev *Element
 
 	// The list to which this element belongs.
+	// 头指针
 	list *List
 
 	// The value stored with this element.
+	// 值
 	Value interface{}
 }
 
@@ -32,6 +35,7 @@ func (e *Element) Next() *Element {
 	if p := e.next; e.list != nil && p != &e.list.root {
 		return p
 	}
+
 	return nil
 }
 
@@ -46,30 +50,40 @@ func (e *Element) Prev() *Element {
 // List represents a doubly linked list.
 // The zero value for List is an empty list ready to use.
 type List struct {
+    // 根节点
 	root Element // sentinel list element, only &root, root.prev, and root.next are used
+
+    // 元素数
 	len  int     // current list length excluding (this) sentinel element
 }
 
 // Init initializes or clears list l.
+// 初始化
 func (l *List) Init() *List {
 	l.root.next = &l.root
 	l.root.prev = &l.root
 	l.len = 0
+
 	return l
 }
 
 // New returns an initialized list.
-func New() *List { return new(List).Init() }
+func New() *List {
+    return new(List).Init()
+}
 
 // Len returns the number of elements of list l.
 // The complexity is O(1).
-func (l *List) Len() int { return l.len }
+func (l *List) Len() int {
+    return l.len
+}
 
 // Front returns the first element of list l or nil if the list is empty.
 func (l *List) Front() *Element {
 	if l.len == 0 {
 		return nil
 	}
+
 	return l.root.next
 }
 
@@ -78,6 +92,7 @@ func (l *List) Back() *Element {
 	if l.len == 0 {
 		return nil
 	}
+
 	return l.root.prev
 }
 
@@ -91,10 +106,15 @@ func (l *List) lazyInit() {
 // insert inserts e after at, increments l.len, and returns e.
 func (l *List) insert(e, at *Element) *Element {
 	n := at.next
+
+    // 在at 之后
 	at.next = e
 	e.prev = at
+
+    // 在next 之前
 	e.next = n
 	n.prev = e
+
 	e.list = l
 	l.len++
 	return e
@@ -107,11 +127,15 @@ func (l *List) insertValue(v interface{}, at *Element) *Element {
 
 // remove removes e from its list, decrements l.len, and returns e.
 func (l *List) remove(e *Element) *Element {
+    // unlink
 	e.prev.next = e.next
 	e.next.prev = e.prev
+
+    // 清空链接
 	e.next = nil // avoid memory leaks
 	e.prev = nil // avoid memory leaks
 	e.list = nil
+
 	l.len--
 	return e
 }
@@ -121,12 +145,15 @@ func (l *List) move(e, at *Element) *Element {
 	if e == at {
 		return e
 	}
+
 	e.prev.next = e.next
 	e.next.prev = e.prev
 
 	n := at.next
+
 	at.next = e
 	e.prev = at
+
 	e.next = n
 	n.prev = e
 
@@ -142,18 +169,21 @@ func (l *List) Remove(e *Element) interface{} {
 		// in l or l == nil (e is a zero Element) and l.remove will crash
 		l.remove(e)
 	}
+
 	return e.Value
 }
 
 // PushFront inserts a new element e with value v at the front of list l and returns e.
 func (l *List) PushFront(v interface{}) *Element {
 	l.lazyInit()
+
 	return l.insertValue(v, &l.root)
 }
 
 // PushBack inserts a new element e with value v at the back of list l and returns e.
 func (l *List) PushBack(v interface{}) *Element {
 	l.lazyInit()
+
 	return l.insertValue(v, l.root.prev)
 }
 
@@ -164,6 +194,7 @@ func (l *List) InsertBefore(v interface{}, mark *Element) *Element {
 	if mark.list != l {
 		return nil
 	}
+
 	// see comment in List.Remove about initialization of l
 	return l.insertValue(v, mark.prev)
 }
@@ -175,6 +206,7 @@ func (l *List) InsertAfter(v interface{}, mark *Element) *Element {
 	if mark.list != l {
 		return nil
 	}
+
 	// see comment in List.Remove about initialization of l
 	return l.insertValue(v, mark)
 }
@@ -186,6 +218,7 @@ func (l *List) MoveToFront(e *Element) {
 	if e.list != l || l.root.next == e {
 		return
 	}
+
 	// see comment in List.Remove about initialization of l
 	l.move(e, &l.root)
 }
@@ -197,6 +230,7 @@ func (l *List) MoveToBack(e *Element) {
 	if e.list != l || l.root.prev == e {
 		return
 	}
+
 	// see comment in List.Remove about initialization of l
 	l.move(e, l.root.prev)
 }
@@ -208,6 +242,7 @@ func (l *List) MoveBefore(e, mark *Element) {
 	if e.list != l || e == mark || mark.list != l {
 		return
 	}
+
 	l.move(e, mark.prev)
 }
 
@@ -218,6 +253,7 @@ func (l *List) MoveAfter(e, mark *Element) {
 	if e.list != l || e == mark || mark.list != l {
 		return
 	}
+
 	l.move(e, mark)
 }
 
@@ -225,6 +261,7 @@ func (l *List) MoveAfter(e, mark *Element) {
 // The lists l and other may be the same. They must not be nil.
 func (l *List) PushBackList(other *List) {
 	l.lazyInit()
+
 	for i, e := other.Len(), other.Front(); i > 0; i, e = i-1, e.Next() {
 		l.insertValue(e.Value, l.root.prev)
 	}
@@ -234,6 +271,7 @@ func (l *List) PushBackList(other *List) {
 // The lists l and other may be the same. They must not be nil.
 func (l *List) PushFrontList(other *List) {
 	l.lazyInit()
+
 	for i, e := other.Len(), other.Back(); i > 0; i, e = i-1, e.Prev() {
 		l.insertValue(e.Value, &l.root)
 	}
