@@ -30,7 +30,10 @@ import "sort"
 // implementation to call. To add and remove things from the heap,
 // use heap.Push and heap.Pop.
 type Interface interface {
+    // 排序接口
 	sort.Interface
+
+    // 插入与弹出
 	Push(x interface{}) // add x as element Len()
 	Pop() interface{}   // remove and return element Len() - 1.
 }
@@ -39,9 +42,11 @@ type Interface interface {
 // Init is idempotent with respect to the heap invariants
 // and may be called whenever the heap invariants may have been invalidated.
 // The complexity is O(n) where n = h.Len().
+// 建堆
 func Init(h Interface) {
 	// heapify
 	n := h.Len()
+
 	for i := n/2 - 1; i >= 0; i-- {
 		down(h, i, n)
 	}
@@ -50,7 +55,10 @@ func Init(h Interface) {
 // Push pushes the element x onto the heap.
 // The complexity is O(log n) where n = h.Len().
 func Push(h Interface, x interface{}) {
+    // 插入
 	h.Push(x)
+
+    // 向上调整
 	up(h, h.Len()-1)
 }
 
@@ -58,9 +66,16 @@ func Push(h Interface, x interface{}) {
 // The complexity is O(log n) where n = h.Len().
 // Pop is equivalent to Remove(h, 0).
 func Pop(h Interface) interface{} {
+    // 少一个数
 	n := h.Len() - 1
+
+    // 将堆头调到，队尾
 	h.Swap(0, n)
+
+    // 新堆头向下调整
 	down(h, 0, n)
+
+    // 弹出
 	return h.Pop()
 }
 
@@ -68,12 +83,18 @@ func Pop(h Interface) interface{} {
 // The complexity is O(log n) where n = h.Len().
 func Remove(h Interface, i int) interface{} {
 	n := h.Len() - 1
+
 	if n != i {
+	    // 会堆尾调换
 		h.Swap(i, n)
+
+        // 向下调整
 		if !down(h, i, n) {
+		    // 再向上调整
 			up(h, i)
 		}
 	}
+
 	return h.Pop()
 }
 

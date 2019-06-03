@@ -4,12 +4,13 @@
 
 package io
 
+// 一定会读到EOF
 type eofReader struct{}
-
 func (eofReader) Read([]byte) (int, error) {
 	return 0, EOF
 }
 
+// 多个reader
 type multiReader struct {
 	readers []Reader
 }
@@ -23,6 +24,7 @@ func (mr *multiReader) Read(p []byte) (n int, err error) {
 				continue
 			}
 		}
+
 		n, err = mr.readers[0].Read(p)
 		if err == EOF {
 			// Use eofReader instead of nil to avoid nil panic
@@ -30,6 +32,7 @@ func (mr *multiReader) Read(p []byte) (n int, err error) {
 			mr.readers[0] = eofReader{} // permit earlier GC
 			mr.readers = mr.readers[1:]
 		}
+
 		if n > 0 || err != EOF {
 			if err == EOF && len(mr.readers) > 0 {
 				// Don't return EOF yet. More readers remain.
@@ -38,6 +41,7 @@ func (mr *multiReader) Read(p []byte) (n int, err error) {
 			return
 		}
 	}
+
 	return 0, EOF
 }
 

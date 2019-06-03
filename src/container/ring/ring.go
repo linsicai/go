@@ -10,12 +10,16 @@ package ring
 // serves as reference to the entire ring. Empty rings are represented
 // as nil Ring pointers. The zero value for a Ring is a one-element
 // ring with a nil Value.
-//
+// 环
+// nil 值为nil
+// 空值，一个元素 & value 是nil
+// 每一个元素都包括整个环的指针
 type Ring struct {
 	next, prev *Ring
 	Value      interface{} // for use by client; untouched by this library
 }
 
+// 初始化
 func (r *Ring) init() *Ring {
 	r.next = r
 	r.prev = r
@@ -25,16 +29,20 @@ func (r *Ring) init() *Ring {
 // Next returns the next ring element. r must not be empty.
 func (r *Ring) Next() *Ring {
 	if r.next == nil {
+	    // 异常，自动重置
 		return r.init()
 	}
+
 	return r.next
 }
 
 // Prev returns the previous ring element. r must not be empty.
 func (r *Ring) Prev() *Ring {
 	if r.next == nil {
+	    // 异常，自动重置
 		return r.init()
 	}
+
 	return r.prev
 }
 
@@ -43,34 +51,49 @@ func (r *Ring) Prev() *Ring {
 //
 func (r *Ring) Move(n int) *Ring {
 	if r.next == nil {
+	    // 异常，自动重置
 		return r.init()
 	}
+
 	switch {
-	case n < 0:
+	case n < 0: // 往后走
 		for ; n < 0; n++ {
 			r = r.prev
 		}
-	case n > 0:
+	case n > 0: // 往前走
 		for ; n > 0; n-- {
 			r = r.next
 		}
 	}
+
 	return r
 }
 
 // New creates a ring of n elements.
 func New(n int) *Ring {
 	if n <= 0 {
+	    // 空值
 		return nil
 	}
+
+    // 至少一个
 	r := new(Ring)
+
+    // p 是当前指针
 	p := r
 	for i := 1; i < n; i++ {
+	    // 插入到p 之后
 		p.next = &Ring{prev: p}
+
+        // p往前走
 		p = p.next
 	}
+
+    // 到最后了，当前next 指向开头节点
+    // 开头节点指向最后一个
 	p.next = r
 	r.prev = p
+
 	return r
 }
 
@@ -92,15 +115,21 @@ func New(n int) *Ring {
 //
 func (r *Ring) Link(s *Ring) *Ring {
 	n := r.Next()
+
 	if s != nil {
 		p := s.Prev()
+
 		// Note: Cannot use multiple assignment because
 		// evaluation order of LHS is not specified.
+		// 插到当前节点之后
 		r.next = s
 		s.prev = r
+	
+	    // 插到下一节点之前
 		n.prev = p
 		p.next = n
 	}
+
 	return n
 }
 
@@ -112,6 +141,7 @@ func (r *Ring) Unlink(n int) *Ring {
 	if n <= 0 {
 		return nil
 	}
+
 	return r.Link(r.Move(n + 1))
 }
 
@@ -120,12 +150,16 @@ func (r *Ring) Unlink(n int) *Ring {
 //
 func (r *Ring) Len() int {
 	n := 0
+
 	if r != nil {
+	    // 本节点算一个
 		n = 1
+
 		for p := r.Next(); p != r; p = p.next {
 			n++
 		}
 	}
+
 	return n
 }
 
@@ -134,6 +168,7 @@ func (r *Ring) Len() int {
 func (r *Ring) Do(f func(interface{})) {
 	if r != nil {
 		f(r.Value)
+
 		for p := r.Next(); p != r; p = p.next {
 			f(p.Value)
 		}

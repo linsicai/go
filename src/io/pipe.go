@@ -15,8 +15,10 @@ import (
 
 // atomicError is a type-safe atomic value for errors.
 // We use a struct{ error } to ensure consistent use of a concrete type.
-type atomicError struct{ v atomic.Value }
-
+// 原子错误
+type atomicError struct {
+    v atomic.Value
+}
 func (a *atomicError) Store(err error) {
 	a.v.Store(struct{ error }{err})
 }
@@ -26,16 +28,23 @@ func (a *atomicError) Load() error {
 }
 
 // ErrClosedPipe is the error used for read or write operations on a closed pipe.
+// 管道已关闭
 var ErrClosedPipe = errors.New("io: read/write on closed pipe")
 
 // A pipe is the shared pipe structure underlying PipeReader and PipeWriter.
 type pipe struct {
+    // 锁
 	wrMu sync.Mutex // Serializes Write operations
+
+    // 读写通道
 	wrCh chan []byte
 	rdCh chan int
 
+    // 结束
 	once sync.Once // Protects closing done
 	done chan struct{}
+
+    // 错误
 	rerr atomicError
 	werr atomicError
 }
@@ -43,16 +52,21 @@ type pipe struct {
 func (p *pipe) Read(b []byte) (n int, err error) {
 	select {
 	case <-p.done:
+	    // 已结束
 		return 0, p.readCloseError()
 	default:
 	}
 
 	select {
 	case bw := <-p.wrCh:
-		nr := copy(b, bw)
+	    // 读成功，取数据
+		nr := copy(b, bw)p
+
+        // 通知读了多少
 		p.rdCh <- nr
 		return nr, nil
 	case <-p.done:
+	    // 结束了
 		return 0, p.readCloseError()
 	}
 }
@@ -60,8 +74,11 @@ func (p *pipe) Read(b []byte) (n int, err error) {
 func (p *pipe) readCloseError() error {
 	rerr := p.rerr.Load()
 	if werr := p.werr.Load(); rerr == nil && werr != nil {
+	    // 如果读没错，写有错
 		return werr
 	}
+
+    // 管道已关闭
 	return ErrClosedPipe
 }
 
@@ -77,8 +94,10 @@ func (p *pipe) CloseRead(err error) error {
 func (p *pipe) Write(b []byte) (n int, err error) {
 	select {
 	case <-p.done:
+	    // 已结束
 		return 0, p.writeCloseError()
 	default:
+	    // 加锁
 		p.wrMu.Lock()
 		defer p.wrMu.Unlock()
 	}
@@ -86,30 +105,41 @@ func (p *pipe) Write(b []byte) (n int, err error) {
 	for once := true; once || len(b) > 0; once = false {
 		select {
 		case p.wrCh <- b:
-			nw := <-p.rdCh
-			b = b[nw:]
-			n += nw
+			nw := <-p.rdCh // 看读了多少
+			b = b[nw:] // 获取剩余数据
+			n += nw       // 写了多少
 		case <-p.done:
+		    // 报错
 			return n, p.writeCloseError()
 		}
 	}
+
+    // 成功
 	return n, nil
 }
 
 func (p *pipe) writeCloseError() error {
 	werr := p.werr.Load()
 	if rerr := p.rerr.Load(); werr == nil && rerr != nil {
+	    // 写没错，但是读错了
 		return rerr
 	}
+
+    // 管道已关闭
 	return ErrClosedPipe
 }
 
+// 关闭管道
 func (p *pipe) CloseWrite(err error) error {
 	if err == nil {
+	    // 没错设置为EOF
 		err = EOF
 	}
+
+    // 存储错误
 	p.werr.Store(err)
 	p.once.Do(func() { close(p.done) })
+
 	return nil
 }
 
@@ -189,5 +219,6 @@ func Pipe() (*PipeReader, *PipeWriter) {
 		rdCh: make(chan int),
 		done: make(chan struct{}),
 	}
+
 	return &PipeReader{p}, &PipeWriter{p}
 }
