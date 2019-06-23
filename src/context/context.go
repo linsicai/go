@@ -62,6 +62,7 @@ type Context interface {
 	// Deadline returns the time when work done on behalf of this context
 	// should be canceled. Deadline returns ok==false when no deadline is
 	// set. Successive calls to Deadline return the same results.
+	// 返回截止日期，ok 表示是否设置
 	Deadline() (deadline time.Time, ok bool)
 
 	// Done returns a channel that's closed when work done on behalf of this
@@ -93,6 +94,7 @@ type Context interface {
 	//
 	// See https://blog.golang.org/pipelines for more examples of how to use
 	// a Done channel for cancellation.
+	// 结束通道
 	Done() <-chan struct{}
 
 	// If Done is not yet closed, Err returns nil.
@@ -100,6 +102,7 @@ type Context interface {
 	// Canceled if the context was canceled
 	// or DeadlineExceeded if the context's deadline passed.
 	// After Err returns a non-nil error, successive calls to Err return the same error.
+	// 错误
 	Err() error
 
 	// Value returns the value associated with this context for key, or nil
@@ -147,42 +150,40 @@ type Context interface {
 	// 		u, ok := ctx.Value(userKey).(*User)
 	// 		return u, ok
 	// 	}
+	// map
 	Value(key interface{}) interface{}
 }
 
 // Canceled is the error returned by Context.Err when the context is canceled.
+// 取消错误
 var Canceled = errors.New("context canceled")
 
 // DeadlineExceeded is the error returned by Context.Err when the context's
 // deadline passes.
+// 超时错误
 var DeadlineExceeded error = deadlineExceededError{}
 
 type deadlineExceededError struct{}
-
 func (deadlineExceededError) Error() string   { return "context deadline exceeded" }
 func (deadlineExceededError) Timeout() bool   { return true }
 func (deadlineExceededError) Temporary() bool { return true }
 
 // An emptyCtx is never canceled, has no values, and has no deadline. It is not
 // struct{}, since vars of this type must have distinct addresses.
+// 空的上下文
 type emptyCtx int
-
 func (*emptyCtx) Deadline() (deadline time.Time, ok bool) {
 	return
 }
-
 func (*emptyCtx) Done() <-chan struct{} {
 	return nil
 }
-
 func (*emptyCtx) Err() error {
 	return nil
 }
-
 func (*emptyCtx) Value(key interface{}) interface{} {
 	return nil
 }
-
 func (e *emptyCtx) String() string {
 	switch e {
 	case background:
@@ -192,7 +193,6 @@ func (e *emptyCtx) String() string {
 	}
 	return "unknown empty Context"
 }
-
 var (
 	background = new(emptyCtx)
 	todo       = new(emptyCtx)
@@ -217,6 +217,7 @@ func TODO() Context {
 // A CancelFunc tells an operation to abandon its work.
 // A CancelFunc does not wait for the work to stop.
 // After the first call, subsequent calls to a CancelFunc do nothing.
+// 取消函数
 type CancelFunc func()
 
 // WithCancel returns a copy of parent with a new Done channel. The returned
@@ -226,8 +227,13 @@ type CancelFunc func()
 // Canceling this context releases resources associated with it, so code should
 // call cancel as soon as the operations running in this Context complete.
 func WithCancel(parent Context) (ctx Context, cancel CancelFunc) {
+    // 构建上下文
 	c := newCancelCtx(parent)
+
+    // 建立亲子关系
 	propagateCancel(parent, &c)
+
+    // 设置取消函数，返回上下文
 	return &c, func() { c.cancel(true, Canceled) }
 }
 
@@ -239,14 +245,19 @@ func newCancelCtx(parent Context) cancelCtx {
 // propagateCancel arranges for child to be canceled when parent is.
 func propagateCancel(parent Context, child canceler) {
 	if parent.Done() == nil {
+	    // 过滤掉永不结束的父亲
 		return // parent is never canceled
 	}
+
 	if p, ok := parentCancelCtx(parent); ok {
+	    // 找取消父亲
 		p.mu.Lock()
 		if p.err != nil {
 			// parent has already been canceled
+			// 父亲出错了，儿子同样的错误
 			child.cancel(false, p.err)
 		} else {
+		    // 加入到儿子列表中
 			if p.children == nil {
 				p.children = make(map[canceler]struct{})
 			}
@@ -255,6 +266,7 @@ func propagateCancel(parent Context, child canceler) {
 		p.mu.Unlock()
 	} else {
 		go func() {
+		    // 起协程，等待父亲结束 或 儿子结束
 			select {
 			case <-parent.Done():
 				child.cancel(false, parent.Err())
@@ -284,10 +296,13 @@ func parentCancelCtx(parent Context) (*cancelCtx, bool) {
 
 // removeChild removes a context from its parent.
 func removeChild(parent Context, child canceler) {
+    // 看是否取消上下文
 	p, ok := parentCancelCtx(parent)
 	if !ok {
 		return
 	}
+
+    // 加锁删除
 	p.mu.Lock()
 	if p.children != nil {
 		delete(p.children, child)
@@ -299,6 +314,7 @@ func removeChild(parent Context, child canceler) {
 // implementations are *cancelCtx and *timerCtx.
 type canceler interface {
 	cancel(removeFromParent bool, err error)
+
 	Done() <-chan struct{}
 }
 
@@ -311,9 +327,12 @@ func init() {
 
 // A cancelCtx can be canceled. When canceled, it also cancels any children
 // that implement canceler.
+// 取消上下午
+文
 type cancelCtx struct {
 	Context
 
+    // 锁，结束通道，孩子，错误
 	mu       sync.Mutex            // protects following fields
 	done     chan struct{}         // created lazily, closed by first cancel call
 	children map[canceler]struct{} // set to nil by the first cancel call
@@ -337,14 +356,17 @@ func (c *cancelCtx) Err() error {
 	return err
 }
 
+// 字符串类型
 type stringer interface {
 	String() string
 }
 
+// 上下文名称
 func contextName(c Context) string {
 	if s, ok := c.(stringer); ok {
 		return s.String()
 	}
+
 	return reflectlite.TypeOf(c).String()
 }
 
@@ -355,20 +377,27 @@ func (c *cancelCtx) String() string {
 // cancel closes c.done, cancels each of c's children, and, if
 // removeFromParent is true, removes c from its parent's children.
 func (c *cancelCtx) cancel(removeFromParent bool, err error) {
+    // 没错不能取消
 	if err == nil {
 		panic("context: internal error: missing cancel error")
 	}
+
+    // 加锁处理
 	c.mu.Lock()
 	if c.err != nil {
 		c.mu.Unlock()
 		return // already canceled
 	}
+
+    // 开启结束通道
 	c.err = err
 	if c.done == nil {
 		c.done = closedchan
 	} else {
 		close(c.done)
 	}
+
+    // 取消所有孩子
 	for child := range c.children {
 		// NOTE: acquiring the child's lock while holding parent's lock.
 		child.cancel(false, err)
@@ -376,6 +405,7 @@ func (c *cancelCtx) cancel(removeFromParent bool, err error) {
 	c.children = nil
 	c.mu.Unlock()
 
+    // 从父节点中删除自己
 	if removeFromParent {
 		removeChild(c.Context, c)
 	}
@@ -393,21 +423,30 @@ func (c *cancelCtx) cancel(removeFromParent bool, err error) {
 func WithDeadline(parent Context, d time.Time) (Context, CancelFunc) {
 	if cur, ok := parent.Deadline(); ok && cur.Before(d) {
 		// The current deadline is already sooner than the new one.
+		// 父节点已经超时了
 		return WithCancel(parent)
 	}
+
+    // new
 	c := &timerCtx{
 		cancelCtx: newCancelCtx(parent),
 		deadline:  d,
 	}
+
+    // 建立父子关系
 	propagateCancel(parent, c)
+
+    // 看是否超时了
 	dur := time.Until(d)
 	if dur <= 0 {
 		c.cancel(true, DeadlineExceeded) // deadline has already passed
 		return c, func() { c.cancel(false, Canceled) }
 	}
+
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.err == nil {
+	    // 启动定时器
 		c.timer = time.AfterFunc(dur, func() {
 			c.cancel(true, DeadlineExceeded)
 		})
@@ -420,8 +459,11 @@ func WithDeadline(parent Context, d time.Time) (Context, CancelFunc) {
 // delegating to cancelCtx.cancel.
 type timerCtx struct {
 	cancelCtx
+
+    // 定时器
 	timer *time.Timer // Under cancelCtx.mu.
 
+    // 截止时间
 	deadline time.Time
 }
 
@@ -436,11 +478,16 @@ func (c *timerCtx) String() string {
 }
 
 func (c *timerCtx) cancel(removeFromParent bool, err error) {
+    // 取消
 	c.cancelCtx.cancel(false, err)
+
+    // 从父节点剔除
 	if removeFromParent {
 		// Remove this timerCtx from its parent cancelCtx's children.
 		removeChild(c.cancelCtx.Context, c)
 	}
+
+    // 关闭计时器
 	c.mu.Lock()
 	if c.timer != nil {
 		c.timer.Stop()
@@ -476,6 +523,7 @@ func WithTimeout(parent Context, timeout time.Duration) (Context, CancelFunc) {
 // interface{}, context keys often have concrete type
 // struct{}. Alternatively, exported context key variables' static
 // type should be a pointer or interface.
+// 新建kv 上下文，key 非空且可比较
 func WithValue(parent Context, key, val interface{}) Context {
 	if key == nil {
 		panic("nil key")
@@ -483,11 +531,13 @@ func WithValue(parent Context, key, val interface{}) Context {
 	if !reflectlite.TypeOf(key).Comparable() {
 		panic("key is not comparable")
 	}
+
 	return &valueCtx{parent, key, val}
 }
 
 // A valueCtx carries a key-value pair. It implements Value for that key and
 // delegates all other calls to the embedded Context.
+// kv 上下文
 type valueCtx struct {
 	Context
 	key, val interface{}
@@ -496,6 +546,7 @@ type valueCtx struct {
 // stringify tries a bit to stringify v, without using fmt, since we don't
 // want context depending on the unicode tables. This is only used by
 // *valueCtx.String().
+// 转字符串
 func stringify(v interface{}) string {
 	switch s := v.(type) {
 	case stringer:
@@ -516,5 +567,6 @@ func (c *valueCtx) Value(key interface{}) interface{} {
 	if c.key == key {
 		return c.val
 	}
+
 	return c.Context.Value(key)
 }
