@@ -21,19 +21,23 @@ func AllocsPerRun(runs int, f func()) (avg float64) {
 	defer runtime.GOMAXPROCS(runtime.GOMAXPROCS(1))
 
 	// Warm up the function
+	// 预热
 	f()
 
 	// Measure the starting statistics
+	// 测量开始的统计
 	var memstats runtime.MemStats
 	runtime.ReadMemStats(&memstats)
 	mallocs := 0 - memstats.Mallocs
 
 	// Run the function the specified number of times
+	// 跑N 次
 	for i := 0; i < runs; i++ {
 		f()
 	}
 
 	// Read the final statistics
+	// 测量最终结果
 	runtime.ReadMemStats(&memstats)
 	mallocs += memstats.Mallocs
 

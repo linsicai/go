@@ -4,9 +4,12 @@
 
 package strconv
 
+// ascii to bool
+
 // ParseBool returns the boolean value represented by the string.
 // It accepts 1, t, T, TRUE, true, True, 0, f, F, FALSE, false, False.
 // Any other value returns an error.
+// 字符串转bool
 func ParseBool(str string) (bool, error) {
 	switch str {
 	case "1", "t", "T", "true", "TRUE", "True":
@@ -14,14 +17,18 @@ func ParseBool(str string) (bool, error) {
 	case "0", "f", "F", "false", "FALSE", "False":
 		return false, nil
 	}
+
+    // 转换出错
 	return false, syntaxError("ParseBool", str)
 }
 
 // FormatBool returns "true" or "false" according to the value of b.
+// bool 转字符串
 func FormatBool(b bool) string {
 	if b {
 		return "true"
 	}
+
 	return "false"
 }
 
@@ -31,5 +38,6 @@ func AppendBool(dst []byte, b bool) []byte {
 	if b {
 		return append(dst, "true"...)
 	}
+
 	return append(dst, "false"...)
 }
